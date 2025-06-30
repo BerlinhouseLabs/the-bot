@@ -26,7 +26,7 @@ BerlinBot is an open source AI-powered Telegram assistant designed for community
 **Key Features:**
 
 - **AI Q&A:** Ask questions in your group, get answers powered by Azure OpenAI, Notion, and vector search.
-- **Persistent Memory & Knowledge Graph:** All messages and members are stored in Supabase and Zep for context-aware responses and relationship reasoning.
+- **Persistent Memory & Knowledge Graph:** All messages and members are stored in Zep Cloud for context-aware responses and relationship reasoning.
 - **Ontology:** Models users, projects, events, interests, and their relationships for advanced community insights.
 - **Easy Telegram Integration:** Add BerlinBot to your group and start chatting.
 - **Health Checks:** Production-ready with health endpoints.
@@ -38,17 +38,17 @@ BerlinBot is an open source AI-powered Telegram assistant designed for community
 
 ```mermaid
 graph TD;
-  TG["Telegram Group"] -->|Webhook| API["BerlinBot API (NestJS)"]
+  TG["Telegram Group"] -->|Polling| API["BerlinBot API (NestJS)"]
   API --> AI["AI Service (Azure OpenAI, Notion, LangChain)"]
-  API --> DB["Database (Supabase)"]
+  API --> DB["Database (Supabase: QA + Vector DB)"]
   API --> ZEP["Zep Cloud (Memory & Ontology)"]
   API --> Health["Health Checks"]
 ```
 
 - **NestJS**: Main application framework.
 - **Azure OpenAI + Notion (via MCP server) + LangChain**: AI answers with Notion as a knowledge base and vector search for context.
-- **Supabase**: Stores messages, members, and vectors.
-- **Zep**: Persistent memory and community knowledge graph (ontology).
+- **Supabase**: Stores question/answer data and acts as a vector database for semantic search.
+- **Zep**: Persistent memory, message storage, and community knowledge graph (ontology).
 
 ---
 
@@ -105,9 +105,9 @@ $ yarn test:cov
 ## 🤖 Telegram Integration
 
 - Add your bot to a Telegram group.
-- Set the webhook to your deployed endpoint (`/api/v1/core/telegram/webhook`).
+- The bot uses polling to receive messages (no webhook setup required).
 - Use `/ask <question>` in the group to get AI-powered answers.
-- All group messages are processed for context and memory.
+- All group messages are processed for context and memory (handled by Zep Cloud).
 
 ---
 
@@ -115,15 +115,15 @@ $ yarn test:cov
 
 - Uses Azure OpenAI for LLM responses, orchestrated by LangChain.
 - Integrates with Notion (via MCP server) for up-to-date knowledge.
-- Vector search (via Supabase Edge Function and LangChain) is always performed before Notion lookup for context-rich answers.
+- Vector search (via Supabase as a vector database and LangChain) is always performed before Notion lookup for context-rich answers.
 - Custom system prompt and tool usage order are codified in the prompts.
 
 ---
 
 ## 🗄️ Database, Memory & Ontology
 
-- **Supabase**: Stores all messages and members for analytics and context.
-- **Zep Cloud**: Adds persistent memory and a community knowledge graph (ontology) for advanced context, recommendations, and relationship reasoning.
+- **Supabase**: Stores only question/answer data and acts as a vector database for semantic search (does not store messages or members).
+- **Zep Cloud**: Handles persistent memory, message storage, and a community knowledge graph (ontology) for advanced context, recommendations, and relationship reasoning.
 - **Ontology**: Models users, projects, events, interests, and their relationships (e.g., MEMBER_OF, WORKS_ON, ATTENDS).
 - **Supabase Edge Functions**: Used for embedding and vector operations (see `supabase/functions/embedding`).
 
