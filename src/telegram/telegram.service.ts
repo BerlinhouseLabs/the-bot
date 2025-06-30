@@ -5,11 +5,11 @@ import {
   OnModuleDestroy,
 } from '@nestjs/common';
 import { Bot } from 'grammy';
-import { Update } from 'grammy/types';
 import { ConfigService } from '@nestjs/config';
 import { addReplyParam } from '@roziscoding/grammy-autoquote';
 
 import { AiService } from '../ai/services/ai.service';
+import { DatabaseService } from '../database/database.service';
 
 @Injectable()
 export class TelegramService implements OnModuleInit, OnModuleDestroy {
@@ -19,6 +19,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly aiService: AiService,
     private readonly config: ConfigService,
+    private readonly databaseService: DatabaseService,
   ) {
     this.bot = new Bot(this.config.get<string>('BOT_TOKEN'));
   }
@@ -26,54 +27,40 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
   async onModuleInit() {
     this.bot.command('ask', async (ctx) => {
       if (!ctx.match) return;
-
+      this.logger.log(`Received ask command: ${ctx.match}`);
       ctx.api.config.use(addReplyParam(ctx));
       await this.handleAskCommand(ctx);
     });
 
     this.bot.on('message', async (ctx) => {
-      if (!ctx.message?.text) return;
-
+      if (!ctx.message?.text || ctx.message.text.trim() === '') return;
       if (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup') {
-        this.logger.log(`Received group message: ${ctx.message.text}`);
+        this.logger.log(`Received message: ${ctx.message.text}`);
         await this.handleMessage(ctx);
       }
     });
 
-    const base = this.config.get<string>('WEBHOOK_BASE_URL');
-
-    if (!base) {
-      throw new Error(
-        'WEBHOOK_BASE_URL is not set. Run a tunnel (ngrok) and set it in your .env.',
-      );
-    }
-
-    const route = '/api/v1/core/telegram/webhook';
-    const webhookUrl = `${base.replace(/\/$/, '')}${route}`;
-
-    await this.bot.init();
-
-    const secretToken = this.config.get<string>('TELEGRAM_WEBHOOK_SECRET');
-
-    await this.bot.api.setWebhook(webhookUrl, {
-      secret_token: secretToken,
-      allowed_updates: ['message'],
+    await this.bot.start({
+      onStart: () => {
+        this.logger.log('Telegram bot started polling for updates');
+      },
     });
-
-    this.logger.log(`Telegram webhook registered ➜ ${webhookUrl}`);
   }
 
   async onModuleDestroy() {
-    await this.bot.api.deleteWebhook({ drop_pending_updates: false });
-  }
-
-  async handleUpdate(update: Update) {
-    await this.bot.handleUpdate(update);
+    await this.bot.stop();
+    this.logger.log('Telegram bot stopped');
   }
 
   private async handleAskCommand(ctx: any) {
-    const answer = await this.aiService.getAnswer(ctx.match);
-    await ctx.reply(answer as string);
+    const structuredResponse = await this.aiService.getAnswer(ctx.match);
+    await ctx.reply(structuredResponse.answer);
+
+    await this.aiService.processMessage(ctx.message);
+    await this.databaseService.saveQuestion({
+      question: ctx,
+      response: structuredResponse,
+    });
   }
 
   private async handleMessage(ctx: any) {

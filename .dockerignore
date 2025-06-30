@@ -1,0 +1,8 @@
+node_modules
+supabase
+dist
+*.log
+*.md
+.git
+.env
+.env.example

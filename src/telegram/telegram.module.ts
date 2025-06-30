@@ -2,11 +2,10 @@ import { Module } from '@nestjs/common';
 
 import { AiModule } from '../ai/ai.module';
 import { TelegramService } from './telegram.service';
-import { TelegramController } from './telegram.controller';
+import { DatabaseModule } from '../database/database.module';
 
 @Module({
-  imports: [AiModule],
-  controllers: [TelegramController],
+  imports: [DatabaseModule, AiModule],
   providers: [TelegramService],
   exports: [TelegramService],
 })

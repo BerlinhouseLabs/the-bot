@@ -5,6 +5,8 @@ import { createReactAgent } from '@langchain/langgraph/prebuilt';
 
 import { ToolsService } from './tools.service';
 import { MemoryService } from './memory.service';
+import { QA_SYSTEM_PROMPT } from '../../common/prompts';
+import { QA_RESPONSE_SCHEMA } from '../../common/schema';
 
 @Injectable()
 export class AiService {
@@ -17,8 +19,8 @@ export class AiService {
     private readonly memoryService: MemoryService,
   ) {
     this.llm = new AzureChatOpenAI({
-      model: 'o4-mini',
-      azureOpenAIApiDeploymentName: 'o4-mini',
+      model: this.config.get('REASONING_MODEL'),
+      azureOpenAIApiDeploymentName: this.config.get('REASONING_MODEL'),
       azureOpenAIApiVersion: '2024-12-01-preview',
     });
   }
@@ -29,25 +31,35 @@ export class AiService {
     const agent = createReactAgent({
       llm: this.llm,
       tools,
+      responseFormat: QA_RESPONSE_SCHEMA,
     });
 
     try {
-      const response = await agent.invoke({
-        messages: [
-          {
-            role: 'system',
-            content:
-              'You are a helpful AI assistant that always references Notion for data and information.',
-          },
-          { role: 'user', content: question },
-        ],
-      });
-      return response.messages[response.messages?.length - 1].content;
+      const response = await agent.invoke(
+        {
+          messages: [
+            {
+              role: 'system',
+              content: QA_SYSTEM_PROMPT,
+            },
+            { role: 'user', content: question },
+          ],
+        },
+        { recursionLimit: 50 },
+      );
+
+      return response.structuredResponse;
     } catch (error) {
       this.logger.error('Error during agent execution:', error);
-      if (error.name === 'ToolException') {
-        this.logger.error('Tool execution failed:', error.message);
-      }
+      return {
+        answer:
+          'I encountered an error while trying to find an answer. Please try rephrasing your question.',
+        source_type: null,
+        source_document: null,
+        confidence_score: 0,
+        retrieval_score: null,
+        tool_used: null,
+      };
     }
   }
 

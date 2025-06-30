@@ -5,7 +5,7 @@
 <h1 align="center">BerlinBot</h1>
 
 <p align="center">
-  <b>AI-powered Telegram assistant for communities, built with NestJS, Zep, and Notion.</b>
+  <b>Open source AI-powered Telegram assistant for communities, built with NestJS, Supabase, Azure OpenAI, Notion, and Zep. Maintained by and for members of the Frontier Tower.</b>
 </p>
 
 <p align="center">
@@ -21,15 +21,16 @@
 
 ## 🚀 What is BerlinBot?
 
-BerlinBot is an AI-powered Telegram assistant designed for community groups. It leverages advanced LLMs, Notion knowledge, and persistent memory to answer questions, summarize discussions, and provide insights—all within your Telegram group.
+BerlinBot is an open source AI-powered Telegram assistant designed for community groups. It leverages advanced LLMs (Azure OpenAI via LangChain), Notion knowledge, persistent memory, and a community knowledge graph to answer questions, summarize discussions, and provide insights—all within your Telegram group.
 
 **Key Features:**
 
-- **AI Q&A:** Ask questions in your group, get answers powered by OpenAI and Notion.
-- **Persistent Memory:** All messages and members are stored in Zep for context-aware responses.
+- **AI Q&A:** Ask questions in your group, get answers powered by Azure OpenAI, Notion, and vector search.
+- **Persistent Memory & Knowledge Graph:** All messages and members are stored in Supabase and Zep for context-aware responses and relationship reasoning.
+- **Ontology:** Models users, projects, events, interests, and their relationships for advanced community insights.
 - **Easy Telegram Integration:** Add BerlinBot to your group and start chatting.
-- **Health Checks & Background Tasks:** Production-ready with health endpoints and scheduled jobs.
-- **Cloud Native:** Deployable on Vercel, AWS, or your own infrastructure.
+- **Health Checks:** Production-ready with health endpoints.
+- **Cloud Native:** Deployable on your own infrastructure, Docker, or any Node.js-compatible cloud.
 
 ---
 
@@ -38,16 +39,16 @@ BerlinBot is an AI-powered Telegram assistant designed for community groups. It 
 ```mermaid
 graph TD;
   TG["Telegram Group"] -->|Webhook| API["BerlinBot API (NestJS)"]
-  API --> AI["AI Service (OpenAI, Notion)"]
-  API --> ZEP["Zep Cloud (Memory)"]
+  API --> AI["AI Service (Azure OpenAI, Notion, LangChain)"]
+  API --> DB["Database (Supabase)"]
+  API --> ZEP["Zep Cloud (Memory & Ontology)"]
   API --> Health["Health Checks"]
 ```
 
 - **NestJS**: Main application framework.
-- **grammY**: Telegram bot API.
-- **OpenAI + Notion**: AI answers with Notion as a knowledge base.
-- **Zep**: Vector memory and user graph.
-- **Vercel**: Optional serverless deployment.
+- **Azure OpenAI + Notion (via MCP server) + LangChain**: AI answers with Notion as a knowledge base and vector search for context.
+- **Supabase**: Stores messages, members, and vectors.
+- **Zep**: Persistent memory and community knowledge graph (ontology).
 
 ---
 
@@ -57,7 +58,7 @@ graph TD;
 
 ```bash
 $ git clone <your-repo-url>
-$ cd frontiertower-core-api
+$ cd berlinbot
 $ yarn install
 ```
 
@@ -67,10 +68,14 @@ Create a `.env` file with the following (see your cloud providers for values):
 
 ```env
 BOT_TOKEN=your-telegram-bot-token
-WEBHOOK_BASE_URL=https://your-ngrok-or-vercel-url
+WEBHOOK_BASE_URL=https://your-ngrok-or-cloud-url
 TELEGRAM_WEBHOOK_SECRET=your-telegram-webhook-secret
+SUPABASE_URL=your-supabase-url
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
 ZEP_API_KEY=your-zep-api-key
 NOTION_API_KEY=your-notion-api-key
+EMBEDDING_MODEL=your-azure-embedding-model
+REASONING_MODEL=your-azure-chat-model
 PORT=3000
 ```
 
@@ -106,32 +111,40 @@ $ yarn test:cov
 
 ---
 
-## 🧠 AI & Notion Integration
+## 🧠 AI, Notion & Vector Search
 
-- Uses OpenAI (via Azure) for LLM responses.
-- Integrates with Notion via MCP for up-to-date knowledge.
-- Custom system prompt: "You are a helpful AI assistant that always references Notion for data and information."
-
----
-
-## 🧠 Memory & Context
-
-- **Zep Cloud**: Adds vector memory and user graph for advanced context and recommendations.
+- Uses Azure OpenAI for LLM responses, orchestrated by LangChain.
+- Integrates with Notion (via MCP server) for up-to-date knowledge.
+- Vector search (via Supabase Edge Function and LangChain) is always performed before Notion lookup for context-rich answers.
+- Custom system prompt and tool usage order are codified in the prompts.
 
 ---
 
-## 🩺 Health Checks & Background Tasks
+## 🗄️ Database, Memory & Ontology
+
+- **Supabase**: Stores all messages and members for analytics and context.
+- **Zep Cloud**: Adds persistent memory and a community knowledge graph (ontology) for advanced context, recommendations, and relationship reasoning.
+- **Ontology**: Models users, projects, events, interests, and their relationships (e.g., MEMBER_OF, WORKS_ON, ATTENDS).
+- **Supabase Edge Functions**: Used for embedding and vector operations (see `supabase/functions/embedding`).
+
+---
+
+## 🩺 Health Checks
 
 - `/health`: Health check endpoint (uses NestJS Terminus).
-- Scheduled background jobs (e.g., every 5 minutes) for maintenance/logging.
 
 ---
 
 ## 🚀 Deployment
 
-### Vercel
+### Docker
 
-BerlinBot is ready for serverless deployment on Vercel. See `vercel.json` for configuration.
+BerlinBot can be deployed easily with Docker:
+
+```bash
+docker build -t berlinbot .
+docker run -p 3000:3000 --env-file .env berlinbot
+```
 
 ### Custom/Cloud
 
@@ -142,32 +155,35 @@ BerlinBot is ready for serverless deployment on Vercel. See `vercel.json` for co
 
 ## 📁 Project Structure
 
-- `src/ai/` — AI service and module
-- `src/telegram/` — Telegram bot logic
-- `src/tasks/` — Scheduled/background tasks
+- `src/ai/` — AI service and module (LLM, memory, ontology, tools)
+- `src/telegram/` — Telegram bot logic and integration
+- `src/database/` — Database and memory integration
 - `src/health/` — Health check endpoint
-- `src/config/` — Configuration providers
-- `static/` — Static assets (e.g., favicon)
+- `src/config/` — Configuration providers (e.g., Supabase)
+- `src/common/prompts/` — System and QA prompts
+- `src/common/schema/` — Shared schema definitions
+- `supabase/functions/embedding/` — Supabase Edge Function for embeddings
+- `test/` — E2E and integration tests
 
 ---
 
 ## 🙌 Contributing
 
-BerlinBot is open to contributions! Please open issues or pull requests for features, bugfixes, or documentation improvements.
+BerlinBot is open source and welcomes contributions from all members of the Frontier Tower and the wider community! Please open issues or pull requests for features, bugfixes, or documentation improvements.
 
 ---
 
 ## 💬 Support & Resources
 
 - [NestJS Documentation](https://docs.nestjs.com)
-- [grammY Telegram Bot API](https://grammy.dev/)
+- [Supabase Docs](https://supabase.com/docs)
 - [Zep Cloud](https://getzep.com/)
 - [Notion API](https://developers.notion.com/)
-- [Vercel](https://vercel.com/)
-- [Discord Community](https://discord.gg/G7Qnnhy)
+- [LangChain](https://js.langchain.com/)
+- [Azure OpenAI](https://learn.microsoft.com/en-us/azure/ai-services/openai/)
 
 ---
 
 ## 📝 License
 
-BerlinBot is [MIT licensed](LICENSE).
+BerlinBot is currently unlicensed for commercial use. See `package.json` for details. For open source or community use, please contact the maintainers.
